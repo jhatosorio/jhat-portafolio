@@ -962,6 +962,51 @@
   }
   .qualifier-input:focus { border-color: var(--gold); }
   .qualifier-input::placeholder { color: var(--muted); }
+  .contact-type-toggle {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .contact-type-btn {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .contact-type-btn.active {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(180,140,80,0.07);
+  }
+  .wa-field-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .qualifier-prefix-select {
+    background: var(--dark2, #111);
+    border: 1px solid var(--border);
+    color: var(--white);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    padding: 0.9rem 0.5rem;
+    cursor: pointer;
+    min-width: 90px;
+    flex-shrink: 0;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+  }
+  .qualifier-prefix-select:focus { border-color: var(--gold); }
+  .wa-number-input { flex: 1; margin-bottom: 0 !important; }
 
   /* ── LANG TOGGLE ─────────────────────────────── */
   .lang-toggle {
@@ -1793,7 +1838,9 @@ function openQualifier(e) {
   document.getElementById('step1').classList.add('active');
   document.getElementById('q1text').value = '';
   const cn = document.getElementById('contactName'); if(cn) cn.value='';
-  const cw = document.getElementById('contactWA'); if(cw) cw.value='';
+  const wn = document.getElementById('waNumber'); if(wn) wn.value='';
+  const ih = document.getElementById('igHandle'); if(ih) ih.value='';
+  setContactType('wa');
   document.getElementById('next1').classList.remove('enabled');
   ['next2','next3','next4','next5','nextContact'].forEach(id => {
     const el = document.getElementById(id);
@@ -1883,16 +1930,34 @@ function goToContact() {
   updateProgress(6);
   // Apply current lang to contact step placeholders
   const nameInput = document.getElementById('contactName');
-  const waInput = document.getElementById('contactWA');
   if (nameInput) nameInput.placeholder = currentLang === 'en' ? 'Your name' : 'Tu nombre';
-  if (waInput) waInput.placeholder = currentLang === 'en' ? 'WhatsApp or Instagram (@username)' : 'WhatsApp o Instagram (@usuario)';
+  const waNum = document.getElementById('waNumber');
+  if (waNum) waNum.placeholder = currentLang === 'en' ? 'WhatsApp number' : 'Número de WhatsApp';
+  const igH = document.getElementById('igHandle');
+  if (igH) igH.placeholder = currentLang === 'en' ? '@your_instagram' : '@tu_usuario de Instagram';
 }
 
+let currentContactType = 'wa';
+function setContactType(type) {
+  currentContactType = type;
+  document.getElementById('btnWA').classList.toggle('active', type === 'wa');
+  document.getElementById('btnIG').classList.toggle('active', type === 'ig');
+  document.getElementById('waRow').style.display  = type === 'wa' ? 'flex' : 'none';
+  document.getElementById('igRow').style.display  = type === 'ig' ? 'block' : 'none';
+  checkContact();
+}
 function checkContact() {
   const name = document.getElementById('contactName').value.trim();
-  const wa = document.getElementById('contactWA').value.trim();
+  let contactValid = false;
+  if (currentContactType === 'wa') {
+    const num = (document.getElementById('waNumber') || {value:''}).value.trim();
+    contactValid = num.replace(/\D/g,'').length >= 5;
+  } else {
+    const ig = (document.getElementById('igHandle') || {value:''}).value.trim();
+    contactValid = ig.length >= 2;
+  }
   const btn = document.getElementById('nextContact');
-  if (name.length >= 2 && wa.length >= 3) {
+  if (name.length >= 2 && contactValid) {
     btn.classList.add('enabled');
   } else {
     btn.classList.remove('enabled');
@@ -1923,7 +1988,9 @@ function submitQualifier() {
   const payload = {
     lang: currentLang,
     nombre: document.getElementById('contactName').value.trim(),
-    contacto: document.getElementById('contactWA').value.trim(),
+    contacto: currentContactType === 'wa'
+      ? (document.getElementById('waPrefix').value + ' ' + document.getElementById('waNumber').value.trim())
+      : document.getElementById('igHandle').value.trim(),
     q1: answers.q1 || document.getElementById('q1text').value.trim(),
     q2: answers.q2 || '',
     q3: answers.q3 || '',
@@ -2099,9 +2166,45 @@ function submitQualifier() {
       <input type="text" class="qualifier-input" id="contactName"
         data-placeholder-es="Tu nombre" data-placeholder-en="Your name"
         placeholder="Tu nombre" oninput="checkContact()">
-      <input type="text" class="qualifier-input" id="contactWA"
-        data-placeholder-es="WhatsApp o Instagram (@usuario)" data-placeholder-en="WhatsApp or Instagram (@username)"
-        placeholder="WhatsApp o Instagram (@usuario)" oninput="checkContact()">
+      <!-- Contact type toggle -->
+      <div class="contact-type-toggle">
+        <button class="contact-type-btn active" id="btnWA" onclick="setContactType('wa')" type="button">WhatsApp</button>
+        <button class="contact-type-btn" id="btnIG" onclick="setContactType('ig')" type="button">Instagram</button>
+      </div>
+      <!-- WhatsApp: prefix + number -->
+      <div class="wa-field-row" id="waRow">
+        <select class="qualifier-prefix-select" id="waPrefix" onchange="checkContact()" title="Prefijo de país">
+          <option value="+1">🇺🇸 +1</option>
+          <option value="+52">🇲🇽 +52</option>
+          <option value="+57" selected>🇨🇴 +57</option>
+          <option value="+58">🇻🇪 +58</option>
+          <option value="+54">🇦🇷 +54</option>
+          <option value="+56">🇨🇱 +56</option>
+          <option value="+51">🇵🇪 +51</option>
+          <option value="+55">🇧🇷 +55</option>
+          <option value="+593">🇪🇨 +593</option>
+          <option value="+507">🇵🇦 +507</option>
+          <option value="+506">🇨🇷 +506</option>
+          <option value="+1809">🇩🇴 +1809</option>
+          <option value="+34">🇪🇸 +34</option>
+          <option value="+44">🇬🇧 +44</option>
+          <option value="+49">🇩🇪 +49</option>
+          <option value="+33">🇫🇷 +33</option>
+          <option value="+39">🇮🇹 +39</option>
+          <option value="+61">🇦🇺 +61</option>
+          <option value="+64">🇳🇿 +64</option>
+          <option value="+81">🇯🇵 +81</option>
+        </select>
+        <input type="tel" class="qualifier-input wa-number-input" id="waNumber"
+          data-placeholder-es="Número de WhatsApp" data-placeholder-en="WhatsApp number"
+          placeholder="Número de WhatsApp" oninput="checkContact()">
+      </div>
+      <!-- Instagram field (hidden by default) -->
+      <div id="igRow" style="display:none;">
+        <input type="text" class="qualifier-input" id="igHandle"
+          data-placeholder-es="@tu_usuario de Instagram" data-placeholder-en="@your_instagram"
+          placeholder="@tu_usuario de Instagram" oninput="checkContact()">
+      </div>
       <div class="qualifier-nav">
         <button class="qualifier-btn-back" onclick="goTo(5)" data-es="← Volver" data-en="← Back">← Volver</button>
         <button class="qualifier-btn-next" id="nextContact" onclick="submitQualifier()" data-es="Ver resultado →" data-en="See result →">Ver resultado →</button>
